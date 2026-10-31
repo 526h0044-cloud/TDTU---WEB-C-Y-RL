@@ -1,0 +1,6 @@
+{
+  "name": "Săn Điểm Rèn Luyện AI - FB Groups Monitor",
+  "description": "Hệ thống tự động theo dõi các nhóm Facebook trường học, phân tích bài đăng bằng AI để phát hiện và cảnh báo form cộng điểm rèn luyện (ĐRL) tức thì.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

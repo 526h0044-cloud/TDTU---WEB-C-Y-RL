@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation for Facebook Groups
+    function isValidGroup(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.url is string && data.url.size() > 0 && data.url.size() <= 500
+        && data.category is string && data.category.size() <= 50
+        && data.isActive is bool
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
+        && (!('addedBy' in data) || (data.addedBy is string && data.addedBy.size() <= 128))
+        && data.createdAt is string && data.createdAt.size() <= 64
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    // Validation for Scanned Posts
+    function isValidPost(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.postUrl is string && data.postUrl.size() > 0 && data.postUrl.size() <= 500
+        && data.rawContent is string && data.rawContent.size() <= 10000
+        && data.classification is string && (data.classification == 'definite' || data.classification == 'potential' || data.classification == 'none')
+        && (!('confidence' in data) || (data.confidence is number && data.confidence >= 0 && data.confidence <= 100))
+        && (!('groupName' in data) || (data.groupName is string && data.groupName.size() <= 200))
+        && (!('groupId' in data) || (data.groupId is string && data.groupId.size() <= 128))
+        && (!('authorName' in data) || (data.authorName is string && data.authorName.size() <= 200))
+        && (!('summary' in data) || (data.summary is string && data.summary.size() <= 1500))
+        && (!('eventTime' in data) || (data.eventTime is string && data.eventTime.size() <= 200))
+        && (!('deadline' in data) || (data.deadline is string && data.deadline.size() <= 200))
+        && (!('points' in data) || (data.points is string && data.points.size() <= 100))
+        && (!('criteria' in data) || (data.criteria is string && data.criteria.size() <= 200))
+        && (!('isBookmarked' in data) || data.isBookmarked is bool)
+        && (!('isRegistered' in data) || data.isRegistered is bool)
+        && (!('keyPhrases' in data) || (data.keyPhrases is list && data.keyPhrases.size() <= 15))
+        && (!('formUrls' in data) || (data.formUrls is list && data.formUrls.size() <= 15))
+        && data.createdAt is string && data.createdAt.size() <= 64
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    // Validation for Scan Execution Logs
+    function isValidScanLog(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.timestamp is string && data.timestamp.size() <= 64
+        && data.groupsScanned is number && data.groupsScanned >= 0
+        && data.newPostsFound is number && data.newPostsFound >= 0
+        && (!('definiteCount' in data) || (data.definiteCount is number && data.definiteCount >= 0))
+        && (!('potentialCount' in data) || (data.potentialCount is number && data.potentialCount >= 0))
+        && (!('triggeredBy' in data) || (data.triggeredBy is string && data.triggeredBy.size() <= 100))
+        && data.status is string && data.status.size() <= 50;
+    }
+
+    // Groups collection
+    match /groups/{groupId} {
+      allow read: if true;
+      allow create: if isValidId(groupId) && isValidGroup(incoming())
+        && incoming().keys().hasAll(['id', 'name', 'url', 'category', 'isActive', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasOnly(['id', 'name', 'url', 'category', 'description', 'isActive', 'addedBy', 'createdAt', 'updatedAt']);
+      allow update: if isValidId(groupId) && isValidGroup(incoming())
+        && incoming().id == existing().id;
+      allow delete: if isValidId(groupId);
+    }
+
+    // Posts collection (deduplicated by postId hash)
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if isValidId(postId) && isValidPost(incoming())
+        && incoming().keys().hasAll(['id', 'postUrl', 'rawContent', 'classification', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasOnly(['id', 'groupId', 'groupName', 'postUrl', 'authorName', 'rawContent', 'summary', 'classification', 'confidence', 'keyPhrases', 'formUrls', 'eventTime', 'deadline', 'points', 'criteria', 'isBookmarked', 'isRegistered', 'scannedAt', 'createdAt', 'updatedAt']);
+      allow update: if isValidId(postId) && isValidPost(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(postId);
+    }
+
+    // Scan Logs collection
+    match /scan_logs/{logId} {
+      allow read: if true;
+      allow create: if isValidId(logId) && isValidScanLog(incoming())
+        && incoming().keys().hasAll(['id', 'timestamp', 'groupsScanned', 'newPostsFound', 'status'])
+        && incoming().keys().hasOnly(['id', 'timestamp', 'groupsScanned', 'newPostsFound', 'definiteCount', 'potentialCount', 'triggeredBy', 'status']);
+      allow update: if false;
+      allow delete: if isValidId(logId);
+    }
+
+    // Validation for User Settings
+    function isValidSettings(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.soundEnabled is bool
+        && data.targetPoints is number && data.targetPoints >= 0 && data.targetPoints <= 150
+        && (!('studentEmail' in data) || (data.studentEmail is string && data.studentEmail.size() <= 200))
+        && data.updatedAt is string && data.updatedAt.size() <= 64;
+    }
+
+    // Settings collection (Real persistent user preferences)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create, update: if isValidId(settingId) && isValidSettings(incoming())
+        && incoming().keys().hasAll(['id', 'soundEnabled', 'targetPoints', 'updatedAt'])
+        && incoming().keys().hasOnly(['id', 'soundEnabled', 'targetPoints', 'studentEmail', 'updatedAt']);
+      allow delete: if isValidId(settingId);
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

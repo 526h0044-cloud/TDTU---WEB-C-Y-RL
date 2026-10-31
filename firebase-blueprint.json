@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "group": {
+      "title": "Facebook Group Monitor Target",
+      "description": "Represents a university or faculty Facebook group tracked for training point announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "url": { "type": "string", "maxLength": 500 },
+        "category": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "isActive": { "type": "boolean" },
+        "addedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "url", "category", "isActive", "createdAt", "updatedAt"]
+    },
+    "post": {
+      "title": "Scanned DRL Post",
+      "description": "A Facebook post classified by AI for training points (ĐRL) with deduplication hash and extracted forms",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "groupId": { "type": "string", "maxLength": 128 },
+        "groupName": { "type": "string", "maxLength": 200 },
+        "postUrl": { "type": "string", "maxLength": 500 },
+        "authorName": { "type": "string", "maxLength": 200 },
+        "rawContent": { "type": "string", "maxLength": 10000 },
+        "summary": { "type": "string", "maxLength": 1500 },
+        "classification": { "type": "string", "enum": ["definite", "potential", "none"] },
+        "confidence": { "type": "number" },
+        "keyPhrases": { "type": "array" },
+        "formUrls": { "type": "array" },
+        "eventTime": { "type": "string", "maxLength": 200 },
+        "deadline": { "type": "string", "maxLength": 200 },
+        "points": { "type": "string", "maxLength": 100 },
+        "criteria": { "type": "string", "maxLength": 200 },
+        "isBookmarked": { "type": "boolean" },
+        "isRegistered": { "type": "boolean" },
+        "scannedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "postUrl", "rawContent", "classification", "createdAt", "updatedAt"]
+    },
+    "scan_log": {
+      "title": "Scan Execution Log",
+      "description": "Log entry tracking automated or manual scan cycles and deduplication counts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "string" },
+        "groupsScanned": { "type": "number" },
+        "newPostsFound": { "type": "number" },
+        "definiteCount": { "type": "number" },
+        "potentialCount": { "type": "number" },
+        "triggeredBy": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "timestamp", "groupsScanned", "newPostsFound", "status"]
+    },
+    "settings": {
+      "title": "User Preferences & Settings",
+      "description": "Student user settings such as target DRL score and sound alert preferences persisted in Firestore",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "soundEnabled": { "type": "boolean" },
+        "targetPoints": { "type": "number" },
+        "studentEmail": { "type": "string", "maxLength": 200 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "soundEnabled", "targetPoints", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/groups/{groupId}": {
+      "schema": "group",
+      "description": "Collection of Facebook groups to monitor for student training point opportunities"
+    },
+    "/posts/{postId}": {
+      "schema": "post",
+      "description": "Collection of scanned and AI-classified posts with deduplication IDs"
+    },
+    "/scan_logs/{logId}": {
+      "schema": "scan_log",
+      "description": "Collection of scan activity records"
+    },
+    "/settings/{settingId}": {
+      "schema": "settings",
+      "description": "Document holding student user preferences and target goals"
+    }
+  }
+}
