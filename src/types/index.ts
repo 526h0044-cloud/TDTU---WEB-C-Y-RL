@@ -1,4 +1,5 @@
 export type ClassificationType = 'definite' | 'potential' | 'none';
+export type PostIntent = 'announcement' | 'question' | 'discussion';
 
 export interface FBGroup {
   id: string;
@@ -28,6 +29,9 @@ export interface ScannedPost {
   deadline?: string;
   points?: string;
   criteria?: string;
+  intent?: PostIntent;
+  feeOrPrize?: string;
+  tdtuCriteriaId?: number;
   isBookmarked?: boolean;
   isRegistered?: boolean;
   scannedAt: string;
@@ -56,6 +60,9 @@ export interface PostAnalysisResult {
   deadline?: string;
   points?: string;
   criteria?: string;
+  intent?: PostIntent;
+  feeOrPrize?: string;
+  tdtuCriteriaId?: number;
   explanation: string;
 }
 

@@ -97,3 +97,46 @@ test('new POTENTIAL_KEYWORDS match phrases like sinh viên 5 tốt, sv5t, hackat
   const res2 = classifyPostContent(sample2);
   assert.equal(res2.classification, 'potential');
 });
+
+test('detects question intent correctly and avoids false definite alarms', () => {
+  const questionPost = `
+    Dạ cho em hỏi có anh chị nào biết buổi workshop AI ngày mai có được cộng điểm rèn luyện không ạ?
+    Em tìm mãi không thấy link form điểm danh đâu hết. Ai biết cho em xin thông tin với!
+  `;
+  const result = classifyPostContent(questionPost);
+  assert.equal(result.intent, 'question');
+  assert.notEqual(result.classification, 'definite');
+});
+
+test('disambiguates entrance fee and prizes from training points (DRL)', () => {
+  const post = `
+    [CUỘC THI HÙNG BIỆN TIẾNG ANH TDTU]
+    - Lệ phí tham gia: 50.000 VNĐ / bạn.
+    - Tổng giải thưởng: 10.000.000đ tiền mặt.
+    - Quyền lợi sinh viên: Được cộng 4 điểm rèn luyện (Tiêu chí 3).
+    - Hạn đăng ký: 23h59 ngày 12/12/2026.
+    - Link đăng ký: https://forms.gle/tdtu_speech
+  `;
+  const result = classifyPostContent(post);
+  assert.equal(result.classification, 'definite');
+  assert.ok(result.points?.includes('4'));
+  assert.ok(!result.points?.includes('50000') && !result.points?.includes('10000000'));
+  assert.ok(result.feeOrPrize);
+  assert.equal(result.tdtuCriteriaId, 3);
+});
+
+test('disambiguates event time vs registration deadline when multiple dates exist', () => {
+  const post = `
+    [TALKSHOW KỸ NĂNG]
+    Thời gian diễn ra: 08:00 sáng ngày 25/11/2026 tại Hội trường 6B.
+    Thời hạn mở cổng đăng ký: Form sẽ đóng vào lúc 17:00 ngày 22/11/2026.
+    Được cộng 3 ĐRL tiêu chí 1.
+    Link: https://forms.gle/talkshow2026
+  `;
+  const result = classifyPostContent(post);
+  assert.ok(result.deadline?.includes('22/11/2026') || result.deadline?.includes('17:00'));
+  assert.ok(result.eventTime?.includes('25/11/2026') || result.eventTime?.includes('08:00'));
+  assert.equal(result.classification, 'definite');
+  assert.equal(result.tdtuCriteriaId, 1);
+});
+

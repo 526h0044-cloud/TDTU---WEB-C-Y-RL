@@ -72,6 +72,48 @@ Sinh viên hoàn thành bài kiểm tra trực tuyến trên hệ thống e-lear
     authorName: 'Admin Hội Confession',
     postUrl: 'https://www.facebook.com/groups/tdtuconfessions/posts/5519283746192812/',
     content: `Chào mọi người, mình cần pass lại giáo trình Tiếng Anh TOEIC 750+ và máy tính Casio fx 580 còn mới nguyên tem, kèm mấy cuốn vở ghi chép môn Cấu trúc dữ liệu. Bạn nào cần cmt mình ib nhé. Cảm ơn admin duyệt bài!`,
+  },
+  {
+    groupName: 'Đoàn - Hội Khoa Quản trị Kinh doanh (BA - TDTU)',
+    groupId: 'grp_tdtu_ba_faculty',
+    authorName: 'Đoàn Hội QTKD',
+    postUrl: 'https://www.facebook.com/groups/doanhoiba.tdtu/posts/4432198765432109/',
+    content: `[COMPANY TOUR 2026: THAM QUAN THỰC TẾ NHÀ MÁY THÔNG MINH VINAMILK]
+Đoàn - Hội Khoa QTKD tổ chức chuyến tham quan doanh nghiệp giúp sinh viên tiếp cận quy trình vận hành chuỗi cung ứng hiện đại.
+- Thời gian: 07:00 - 12:00 ngày 22/11/2026
+- Địa điểm tập trung: Sân cờ TDTU (xe đưa đón tận nơi)
+- Quyền lợi sinh viên:
+  + Cộng 4 điểm rèn luyện (Tiêu chí 1: Hoạt động học tập và định hướng nghề nghiệp)
+  + Nhận chứng nhận tham gia chương trình thực tế của doanh nghiệp
+- Hạn chót đăng ký: 21:00 ngày 19/11/2026
+- Link form: https://forms.gle/VinamilkTour2026`,
+  },
+  {
+    groupName: 'Đoàn - Hội Khoa Ngoại ngữ (FFL - TDTU)',
+    groupId: 'grp_tdtu_ffl_faculty',
+    authorName: 'Ban Học thuật Khoa Ngoại ngữ',
+    postUrl: 'https://www.facebook.com/groups/doanhoiffl.tdtu/posts/3321987654321098/',
+    content: `[CUỘC THI HÙNG BIỆN TIẾNG ANH "GLOBAL LEADERS SPEAK 2026"]
+Cơ hội khẳng định bản lĩnh ngôn ngữ và tỏa sáng trên sân khấu lớn!
+- Thời gian sơ loại: 13:30 ngày 28/11/2026 tại Phòng 601 Nhà C
+- Quyền lợi:
+  + Cộng 5 điểm rèn luyện (Tiêu chí 3: Hoạt động văn hóa văn nghệ thể thao ngoại ngữ)
+  + Giải thưởng tiền mặt lên đến 5.000.000 VNĐ cho Quán quân
+- Hạn đăng ký: Trước 18:00 ngày 24/11/2026
+- Link form đăng ký: https://docs.google.com/forms/d/e/1FAIpQLSd_GlobalLeaders_2026/viewform`,
+  },
+  {
+    groupName: 'CLB Môi trường Xanh TDTU (Green TDTU)',
+    groupId: 'grp_tdtu_green_club',
+    authorName: 'Ban Chủ nhiệm Green Club',
+    postUrl: 'https://www.facebook.com/groups/moitruongxanh.tdtu/posts/2219876543210987/',
+    content: `[CHIẾN DỊCH NGÀY CHỦ NHẬT XANH - ĐỔI RÁC TÁI CHẾ LẤY SEN ĐÁ]
+Chung tay vì khuôn viên TDTU xanh - sạch - đẹp!
+- Thời gian: 08:00 - 11:30 ngày 16/11/2026
+- Địa điểm: Sảnh Nhà thi đấu TDTU
+- Quyền lợi: Cấp 3 điểm rèn luyện (Tiêu chí 3: Tình nguyện vì cộng đồng và bảo vệ môi trường)
+- Hạn đóng form: 22:00 ngày 14/11/2026
+- Link đăng ký: https://forms.gle/ChuNhatXanhTDTU2026`,
   }
 ];
 

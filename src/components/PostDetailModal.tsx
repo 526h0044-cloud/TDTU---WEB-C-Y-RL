@@ -16,7 +16,9 @@ import {
   Trash2,
   CheckCircle2,
   CalendarPlus,
-  RefreshCw
+  RefreshCw,
+  Coins,
+  HelpCircle
 } from 'lucide-react';
 import { ScannedPost } from '../types';
 
@@ -156,6 +158,19 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
             </h2>
           </div>
 
+          {/* Poster Intent Alert if question */}
+          {post.intent === 'question' && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 flex items-start gap-3">
+              <HelpCircle className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-amber-900 uppercase">Phát hiện bài viết hỏi đáp / thắc mắc</h4>
+                <p className="text-xs text-amber-800 leading-relaxed mt-0.5">
+                  AI nhận diện người đăng đang đặt câu hỏi hoặc xin thông tin/link từ cộng đồng, không phải thông báo phát động hoạt động chính thức. Điểm ĐRL sẽ không được tự động tính vào tiến độ.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Key Opportunity Highlights Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
             {post.points && (
@@ -165,7 +180,22 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
                 </div>
                 <div>
                   <div className="text-[11px] font-medium text-slate-500 uppercase">Điểm thưởng ĐRL</div>
-                  <div className="text-sm font-bold text-slate-900">{post.points}</div>
+                  <div className="text-sm font-bold text-emerald-700">{post.points}</div>
+                </div>
+              </div>
+            )}
+
+            {post.feeOrPrize && (
+              <div className="flex items-start gap-2.5">
+                <div className="p-2 bg-orange-100 text-orange-700 rounded-lg shrink-0">
+                  <Coins className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-medium text-slate-500 uppercase">Lệ phí / Tiền thưởng giải</div>
+                  <div className="text-sm font-bold text-orange-800">
+                    {post.feeOrPrize}
+                    <span className="ml-1 text-[11px] font-normal text-slate-500">(Không nhầm lẫn với ĐRL)</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -176,8 +206,10 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
                   <Sparkles className="h-4 w-4" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-medium text-slate-500 uppercase">Tiêu chí đánh giá</div>
-                  <div className="text-sm font-bold text-slate-900">{post.criteria}</div>
+                  <div className="text-[11px] font-medium text-slate-500 uppercase">
+                    Tiêu chí TDTU {post.tdtuCriteriaId ? `(Tiêu chí ${post.tdtuCriteriaId})` : ''}
+                  </div>
+                  <div className="text-sm font-bold text-indigo-900">{post.criteria}</div>
                 </div>
               </div>
             )}
@@ -200,7 +232,7 @@ export const PostDetailModal: React.FC<PostDetailModalProps> = ({
                   <Calendar className="h-4 w-4" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-medium text-slate-500 uppercase">Thời gian sự kiện</div>
+                  <div className="text-[11px] font-medium text-slate-500 uppercase">Thời gian diễn ra sự kiện</div>
                   <div className="text-sm font-medium text-slate-800">{post.eventTime}</div>
                 </div>
               </div>

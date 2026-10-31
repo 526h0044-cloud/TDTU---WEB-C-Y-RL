@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { FBGroup, ScannedPost, ScanLog, UserSettings } from '../types';
+import { SAMPLE_FACEBOOK_POSTS, buildScannedPostFromRaw } from '../utils/samplePosts';
 
 // Initialize Firebase App & Firestore with specific Database ID
 const app = initializeApp(firebaseConfig);
@@ -72,13 +73,21 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Test connection on boot as required by system skill
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timeout')), 3500)
+    );
+    await Promise.race([getDocFromServer(doc(db, 'test', 'connection')), timeoutPromise]);
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline or starting up.');
+    try {
+      await getDocs(query(collection(db, 'groups'), limit(1)));
+      return true;
+    } catch {
+      if (error instanceof Error && error.message.includes('the client is offline')) {
+        console.warn('Firebase client is offline or starting up.');
+      }
+      return false;
     }
-    return false;
   }
 }
 
@@ -626,8 +635,118 @@ export async function seedInitialDataIfEmpty(): Promise<void> {
         await setDoc(doc(db, 'groups', group.id), sanitizeForFirestore(group as unknown as Record<string, unknown>));
       }
     }
+
+    // Seed initial verified posts if posts collection is empty
+    const existingPosts = await fetchPosts();
+    if (existingPosts.length === 0) {
+      for (const sample of SAMPLE_FACEBOOK_POSTS) {
+        const post = buildScannedPostFromRaw(sample);
+        await savePostIfNotExists(post);
+      }
+    }
   } catch (err) {
     console.warn('Could not seed initial data:', err);
   }
 }
+
+export interface ScanProgressInfo {
+  currentGroup: FBGroup;
+  currentIndex: number;
+  totalGroups: number;
+  percent: number;
+  newPostsFound: number;
+  definiteCount: number;
+  potentialCount: number;
+  skippedDuplicates: number;
+}
+
+/**
+ * Executes a simulated real-time scan cycle across active groups,
+ * analyzes posts, deduplicates by ID hash, updates progress bar, and records scan execution logs.
+ */
+export async function runGroupScan(
+  activeGroups: FBGroup[],
+  onProgress?: (info: ScanProgressInfo) => void
+): Promise<{
+  groupsScanned: number;
+  newPostsFound: number;
+  definiteCount: number;
+  potentialCount: number;
+  skippedDuplicates: number;
+}> {
+  let newPostsFound = 0;
+  let definiteCount = 0;
+  let potentialCount = 0;
+  let skippedDuplicates = 0;
+
+  const total = activeGroups.length;
+
+  for (let i = 0; i < total; i++) {
+    const group = activeGroups[i];
+
+    // Find candidate posts matching this group
+    const matchingPosts = SAMPLE_FACEBOOK_POSTS.filter(
+      (s) => s.groupId === group.id || s.groupName?.toLowerCase() === group.name.toLowerCase()
+    );
+
+    for (const raw of matchingPosts) {
+      const scannedPost = buildScannedPostFromRaw(raw);
+      const result = await savePostIfNotExists(scannedPost);
+      if (result.isNew) {
+        newPostsFound++;
+        if (scannedPost.classification === 'definite') definiteCount++;
+        if (scannedPost.classification === 'potential') potentialCount++;
+      } else {
+        skippedDuplicates++;
+      }
+    }
+
+    const percent = Math.round(((i + 1) / total) * 100);
+
+    if (onProgress) {
+      onProgress({
+        currentGroup: group,
+        currentIndex: i + 1,
+        totalGroups: total,
+        percent,
+        newPostsFound,
+        definiteCount,
+        potentialCount,
+        skippedDuplicates
+      });
+    }
+
+    // Realistic visual pacing so user sees the progress bar animate smoothly
+    await new Promise((r) => setTimeout(r, 120));
+  }
+
+  // Save scan execution log into Firestore
+  const logId = `scan_${Date.now()}`;
+  const now = new Date().toISOString();
+  const scanLog: ScanLog = {
+    id: logId,
+    timestamp: now,
+    groupsScanned: total,
+    newPostsFound,
+    definiteCount,
+    potentialCount,
+    triggeredBy: 'manual_scanner',
+    status: 'success'
+  };
+
+  try {
+    await saveScanLog(scanLog);
+  } catch (logErr) {
+    console.warn('Could not record scan log:', logErr);
+  }
+
+  return {
+    groupsScanned: total,
+    newPostsFound,
+    definiteCount,
+    potentialCount,
+    skippedDuplicates
+  };
+}
+
 

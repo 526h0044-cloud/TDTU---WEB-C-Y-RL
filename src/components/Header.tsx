@@ -7,13 +7,15 @@ import {
   Settings,
   Flame,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  BookOpen
 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenScanner: () => void;
   onOpenGroupManager: () => void;
   onRunAutoScan: () => void;
+  onOpenHandbook: () => void;
   isScanning: boolean;
   soundEnabled: boolean;
   onToggleSound: () => void;
@@ -25,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenScanner,
   onOpenGroupManager,
   onRunAutoScan,
+  onOpenHandbook,
   isScanning,
   soundEnabled,
   onToggleSound,
@@ -82,6 +85,18 @@ export const Header: React.FC<HeaderProps> = ({
             aria-label="Toggle sound alerts"
           >
             {soundEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+          </button>
+
+          {/* TDTU Handbook & AI Advisor Button */}
+          <button
+            type="button"
+            onClick={onOpenHandbook}
+            className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 active:scale-95 transition-all shadow-2xs"
+            title="Cẩm nang quy chế ĐRL TDTU, 5 tiêu chí & AI Cố vấn học bổng"
+          >
+            <BookOpen className="h-3.5 w-3.5 text-amber-700" />
+            <span className="hidden lg:inline">Cẩm nang ĐRL TDTU</span>
+            <span className="lg:hidden">Cẩm nang</span>
           </button>
 
           {/* Auto Scan Simulator Button */}

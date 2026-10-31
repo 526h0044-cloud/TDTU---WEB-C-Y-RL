@@ -28,6 +28,12 @@ import {
 import {
   DrlTargetTracker
 } from './components/DrlTargetTracker';
+import {
+  ScanProgressModal
+} from './components/ScanProgressModal';
+import {
+  TdtuDrlHandbookModal
+} from './components/TdtuDrlHandbookModal';
 import { FBGroup, ScannedPost, UserSettings } from './types';
 import {
   testConnection,
@@ -47,7 +53,9 @@ import {
   seedInitialDataIfEmpty,
   subscribeToUserSettings,
   saveUserSettings,
-  DEFAULT_USER_SETTINGS
+  DEFAULT_USER_SETTINGS,
+  runGroupScan,
+  ScanProgressInfo
 } from './services/firebase';
 import {
   Sparkles,
@@ -60,7 +68,8 @@ import {
   Download,
   Trash2,
   Building2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  BookOpen
 } from 'lucide-react';
 
 export default function App() {
@@ -75,12 +84,16 @@ export default function App() {
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [hasFormOnly, setHasFormOnly] = useState(false);
   const [bookmarksOnly, setBookmarksOnly] = useState(false);
+  const [registeredOnly, setRegisteredOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'newest' | 'points' | 'deadline'>('newest');
 
   // Modals state
   const [selectedDetailPost, setSelectedDetailPost] = useState<ScannedPost | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isGroupManagerOpen, setIsGroupManagerOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState<ScanProgressInfo | null>(null);
+  const [isHandbookOpen, setIsHandbookOpen] = useState(false);
 
   // User Settings state persisted in Firestore (Real Data - No LocalStorage)
   const [userSettings, setUserSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS);
@@ -324,25 +337,59 @@ export default function App() {
     showToast('Đã tải xuống file CSV báo cáo ĐRL thành công!', 'success');
   };
 
-  // Trigger group check
+  // Trigger group check with real AI deduplicated scan
   const handleRunAutoScan = async () => {
     setIsScanning(true);
-    showToast('Đang kết nối các nhóm Facebook để quét bài viết...', 'info');
+    showToast('Đang kết nối các nhóm Facebook và quét bài viết mới...', 'info');
 
     try {
+      const activeGroups = groups.filter((g) => g.isActive);
+      if (activeGroups.length === 0) {
+        showToast('Không có nhóm nào đang bật theo dõi. Vui lòng bật ít nhất 1 nhóm trong Quản lý Groups.', 'warning');
+        setIsScanning(false);
+        return;
+      }
+
+      const scanResult = await runGroupScan(activeGroups, (info) => {
+        setScanProgress(info);
+      });
       const refreshed = await fetchPosts();
       setPosts(refreshed);
-      showToast('Đã đồng bộ cơ sở dữ liệu thời gian thực từ Firebase Cloud!', 'success');
+
+      if (scanResult.newPostsFound > 0) {
+        playAlertSound();
+        showToast(
+          `Đã quét ${scanResult.groupsScanned} nhóm: Phát hiện ${scanResult.newPostsFound} bài mới (${scanResult.definiteCount} bài chắc chắn có ĐRL)!`,
+          'success'
+        );
+      } else {
+        showToast(
+          `Đã quét ${scanResult.groupsScanned} nhóm: Toàn bộ ${scanResult.groupsScanned} nhóm đã được quét, không có bài mới phát sinh!`,
+          'info'
+        );
+      }
     } catch (err) {
-      showToast('Lỗi đồng bộ: ' + (err instanceof Error ? err.message : String(err)), 'warning');
+      showToast('Lỗi khi quét nhóm: ' + (err instanceof Error ? err.message : String(err)), 'warning');
     } finally {
       setIsScanning(false);
+      setScanProgress(null);
     }
   };
 
-  // Filtered posts calculation
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedClassification('all');
+    setSelectedGroup('all');
+    setHasFormOnly(false);
+    setBookmarksOnly(false);
+    setRegisteredOnly(false);
+    setSortBy('newest');
+    showToast('Đã đặt lại toàn bộ bộ lọc', 'info');
+  };
+
+  // Filtered and sorted posts calculation
   const filteredPosts = useMemo(() => {
-    return posts.filter((post) => {
+    const list = posts.filter((post) => {
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -377,11 +424,45 @@ export default function App() {
         if (!post.isBookmarked) return false;
       }
 
+      // Registered only filter
+      if (registeredOnly) {
+        if (!post.isRegistered) return false;
+      }
+
       return true;
     });
-  }, [posts, searchQuery, selectedClassification, selectedGroup, hasFormOnly, bookmarksOnly]);
+
+    // Sorting
+    return list.sort((a, b) => {
+      if (sortBy === 'points') {
+        const getPointsNum = (p: ScannedPost) => {
+          if (!p.points) return 0;
+          const match = p.points.match(/(\d+(?:\.\d+)?)/);
+          return match ? parseFloat(match[1]) : 0;
+        };
+        return getPointsNum(b) - getPointsNum(a);
+      }
+      if (sortBy === 'deadline') {
+        if (a.deadline && !b.deadline) return -1;
+        if (!a.deadline && b.deadline) return 1;
+        return (b.scannedAt || b.createdAt || '').localeCompare(a.scannedAt || a.createdAt || '');
+      }
+      // Default: newest first
+      return (b.scannedAt || b.createdAt || '').localeCompare(a.scannedAt || a.createdAt || '');
+    });
+  }, [posts, searchQuery, selectedClassification, selectedGroup, hasFormOnly, bookmarksOnly, registeredOnly, sortBy]);
 
   const activeGroupCount = groups.filter((g) => g.isActive).length;
+
+  const totalAccumulatedPoints = useMemo(() => {
+    return posts
+      .filter((p) => p.isRegistered && p.classification === 'definite')
+      .reduce((sum, p) => {
+        if (!p.points) return sum;
+        const match = p.points.match(/(\d+(?:\.\d+)?)/);
+        return sum + (match ? parseFloat(match[1]) : 0);
+      }, 0);
+  }, [posts]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-100 selection:text-blue-900">
@@ -390,6 +471,7 @@ export default function App() {
         onOpenScanner={() => setIsScannerOpen(true)}
         onOpenGroupManager={() => setIsGroupManagerOpen(true)}
         onRunAutoScan={handleRunAutoScan}
+        onOpenHandbook={() => setIsHandbookOpen(true)}
         isScanning={isScanning}
         soundEnabled={userSettings.soundEnabled}
         onToggleSound={handleToggleSound}
@@ -433,6 +515,16 @@ export default function App() {
                 <span>Quản lý danh sách Groups</span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => setIsHandbookOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-950 shadow-md active:scale-95 transition-all"
+                title="Mở cẩm nang quy chế 5 tiêu chí ĐRL & Chat Cố vấn AI TDTU"
+              >
+                <BookOpen className="h-4 w-4 text-slate-950" />
+                <span>Cẩm nang ĐRL TDTU</span>
+              </button>
+
               {posts.length > 0 && (
                 <button
                   type="button"
@@ -459,14 +551,17 @@ export default function App() {
         <StatsBar
           posts={posts}
           activeFilter={selectedClassification}
+          hasFormOnly={hasFormOnly}
+          registeredOnly={registeredOnly}
           onSelectFilter={(filter) => {
             if (filter === 'has_form') {
               setHasFormOnly((prev) => !prev);
             } else if (filter === 'registered') {
-              setBookmarksOnly(false);
-              setSelectedClassification('all');
+              setRegisteredOnly((prev) => !prev);
+            } else if (filter === 'definite' || filter === 'potential') {
+              setSelectedClassification((prev) => (prev === filter ? 'all' : filter));
             } else {
-              setSelectedClassification(filter);
+              setSelectedClassification('all');
             }
           }}
         />
@@ -484,6 +579,11 @@ export default function App() {
           onToggleHasFormOnly={() => setHasFormOnly((prev) => !prev)}
           bookmarksOnly={bookmarksOnly}
           onToggleBookmarksOnly={() => setBookmarksOnly((prev) => !prev)}
+          registeredOnly={registeredOnly}
+          onToggleRegisteredOnly={() => setRegisteredOnly((prev) => !prev)}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          onResetFilters={handleResetFilters}
         />
 
         {/* Action Toolbar above posts */}
@@ -596,6 +696,19 @@ export default function App() {
         onClose={() => setIsScannerOpen(false)}
         groups={groups}
         onSavePost={handleSaveScannedPost}
+      />
+
+      {/* Visual Live Scanning Progress Modal */}
+      <ScanProgressModal
+        isOpen={isScanning}
+        progressInfo={scanProgress}
+      />
+
+      {/* TDTU DRL Knowledge Handbook & AI Advisor Modal */}
+      <TdtuDrlHandbookModal
+        isOpen={isHandbookOpen}
+        onClose={() => setIsHandbookOpen(false)}
+        currentPoints={totalAccumulatedPoints}
       />
 
       {/* Toast Alert */}

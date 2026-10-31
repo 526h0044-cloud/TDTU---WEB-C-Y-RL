@@ -1,4 +1,4 @@
-import { ClassificationType, PostAnalysisResult } from '../types/index.ts';
+import { ClassificationType, PostAnalysisResult, PostIntent } from '../types/index.ts';
 
 // Definite ĐRL trigger keywords (lower-case)
 export const DEFINITE_KEYWORDS = [
@@ -40,7 +40,6 @@ export const DEFINITE_KEYWORDS = [
   '+4 đrl',
   '+3 điểm',
   '+5 điểm',
-  // 25+ new university specific definite keywords
   'tiêu chí đánh giá rèn luyện',
   'phiếu đánh giá rèn luyện',
   'cộng điểm rèn luyện tiêu chí',
@@ -100,7 +99,6 @@ export const POTENTIAL_KEYWORDS = [
   'chứng nhận tham gia',
   'certificate',
   'minh chứng',
-  // 25+ new university specific potential keywords
   'sinh viên 5 tốt',
   'sv5t',
   'thanh niên tiên tiến',
@@ -130,11 +128,84 @@ export const POTENTIAL_KEYWORDS = [
   'nckh sinh viên'
 ];
 
+// Inquiry / Question keywords (post is seeking info, NOT announcing a DRL activity)
+export const QUESTION_PATTERNS = [
+  'cho em hỏi',
+  'cho mình hỏi',
+  'mọi người cho em hỏi',
+  'mọi người cho mình hỏi',
+  'anh chị cho em hỏi',
+  'có ai biết',
+  'ai có link form',
+  'cho em xin link',
+  'cho mình xin link',
+  'ai có link',
+  'có được cộng đrl không',
+  'có được cộng điểm rèn luyện không',
+  'có đrl ko',
+  'được mấy đrl',
+  'tính tiêu chí mấy vậy',
+  'có ai tham gia chưa',
+  'xin review',
+  'hỏi về điểm rèn luyện',
+  'sao em chưa thấy cộng đrl',
+  'khi nào có đrl',
+  'bao giờ cộng đrl',
+  'bao giờ mở form'
+];
+
+/**
+ * Detects whether the post is an inquiry/question vs official announcement
+ */
+export function detectPostIntent(text: string): PostIntent {
+  const lower = text.toLowerCase().trim();
+  
+  // Check question patterns
+  for (const q of QUESTION_PATTERNS) {
+    if (lower.includes(q)) {
+      return 'question';
+    }
+  }
+
+  // If text is short, ends with '?', and contains question words
+  if (lower.endsWith('?') || lower.includes('?')) {
+    if (
+      lower.includes('ở đâu') ||
+      lower.includes('bao giờ') ||
+      lower.includes('khi nào') ||
+      lower.includes('như thế nào') ||
+      lower.includes('không ạ') ||
+      lower.includes('ko ạ') ||
+      lower.includes('ai biết')
+    ) {
+      return 'question';
+    }
+  }
+
+  // Check if announcement phrases are present
+  if (
+    lower.includes('thông báo') ||
+    lower.includes('chính thức mở') ||
+    lower.includes('phát động') ||
+    lower.includes('kính gửi') ||
+    lower.includes('ban tổ chức') ||
+    lower.includes('đoàn trường') ||
+    lower.includes('đoàn - hội') ||
+    lower.includes('clb') ||
+    lower.includes('link form đăng ký') ||
+    lower.includes('quyền lợi sinh viên') ||
+    lower.includes('hạn chót đăng ký')
+  ) {
+    return 'announcement';
+  }
+
+  return 'discussion';
+}
+
 /**
  * Extracts links from text, prioritizing form links (Google Forms, MS Forms, forms.gle, etc.)
  */
 export function extractLinks(text: string): { allLinks: string[]; formLinks: string[] } {
-  // Regex to match URLs
   const urlRegex = /(https?:\/\/[^\s<>"'()]+)/gi;
   const matches = text.match(urlRegex) || [];
   
@@ -144,7 +215,7 @@ export function extractLinks(text: string): { allLinks: string[]; formLinks: str
   for (const rawUrl of matches) {
     let cleanUrl = rawUrl.replace(/[.,;:)\]]+$/, ''); // Strip trailing punctuation
     
-    // Unwrap Facebook redirect url if present: https://l.facebook.com/l.php?u=ENCODED_URL
+    // Unwrap Facebook redirect url if present
     if (cleanUrl.includes('l.facebook.com/l.php')) {
       try {
         const parsed = new URL(cleanUrl);
@@ -153,7 +224,7 @@ export function extractLinks(text: string): { allLinks: string[]; formLinks: str
           cleanUrl = decodeURIComponent(target);
         }
       } catch {
-        // ignore parse error
+        // ignore
       }
     }
 
@@ -182,60 +253,209 @@ export function extractLinks(text: string): { allLinks: string[]; formLinks: str
 }
 
 /**
- * Extracts points mentioned in the post (e.g. "+5 điểm", "3 điểm rèn luyện", "Tiêu chí 3 (5đ)")
+ * Extracts fee or prize money distinctly from DRL points.
+ * e.g., "Lệ phí: 20.000đ", "Giải thưởng: 5.000.000 VNĐ", "Miễn phí"
+ */
+export function extractFeeOrPrize(text: string): string | undefined {
+  const lower = text.toLowerCase();
+
+  if (lower.includes('miễn phí') || lower.includes('free') || lower.includes('0 đồng') || lower.includes('0đ')) {
+    return 'Miễn phí tham gia';
+  }
+
+  // Prize money
+  const prizeRegex = /(?:giải thưởng|tổng giải thưởng|giải nhất|thưởng|phần thưởng)[:\s]+([\d.,]+\s*(?:vnđ|vnd|triệu|k|đồng))/i;
+  const prizeMatch = text.match(prizeRegex);
+  if (prizeMatch) {
+    return `Giải thưởng: ${prizeMatch[1].trim()}`;
+  }
+
+  // Entry fee
+  const feeRegex = /(?:lệ phí|phí tham gia|giá vé|vé tham dự|chi phí)[:\s]+([\d.,]+\s*(?:vnđ|vnd|k|nghìn|đồng))/i;
+  const feeMatch = text.match(feeRegex);
+  if (feeMatch) {
+    return `Lệ phí: ${feeMatch[1].trim()}`;
+  }
+
+  return undefined;
+}
+
+/**
+ * Extracts points strictly for Training Points (ĐRL).
+ * CRITICAL DISAMBIGUATION:
+ * - Must NOT match money (50k, 50.000đ, 5.000.000 VNĐ).
+ * - Must NOT match years (2024, 2025, 2026).
+ * - Must NOT match phone numbers (090..., 091...).
+ * - Must NOT match room numbers (P.601, Hội trường 6B).
+ * - Must NOT match participant counts (300 sinh viên, 50 bạn).
+ * - Points range at TDTU is usually 1 to 20 points per event.
  */
 export function extractPoints(text: string): string | undefined {
-  const pointsRegex = /(?:\+|\b(?:cộng|được|nhận)\s*)?(\d+(?:\.\d+)?)\s*(?:đ|điểm|points?)(?:\s*(?:rèn luyện|đrl|drl))?/i;
-  const match = text.match(pointsRegex);
-  if (match) {
-    return match[0].trim();
+  // Pattern 1: Explicit "+X ĐRL" or "+X điểm rèn luyện"
+  const explicitDrlRegex = /(?:\+)\s*([1-9]|1[0-9]|20)\s*(?:đrl|drl|điểm rèn luyện|điểm)/i;
+  const m1 = text.match(explicitDrlRegex);
+  if (m1) {
+    return `+${m1[1]} ĐRL`;
   }
+
+  // Pattern 2: "cộng X điểm rèn luyện" or "cộng X đrl" or "cộng X điểm (tiêu chí...)"
+  const congDrlRegex = /(?:cộng|được cộng|cấp|ghi nhận)\s*([1-9]|1[0-9]|20)\s*(?:đrl|drl|điểm rèn luyện|điểm)/i;
+  const m2 = text.match(congDrlRegex);
+  if (m2) {
+    return `+${m2[1]} ĐRL`;
+  }
+
+  // Pattern 3: Within criteria context e.g. "Tiêu chí 3 (5đ)" or "Tiêu chí 1: 3 điểm"
+  const critPointRegex = /tiêu chí\s*[1-5IV]+\s*(?:\([^)]*|\s*[-:]\s*)([1-9]|1[0-9]|20)\s*(?:đ|điểm)/i;
+  const m3 = text.match(critPointRegex);
+  if (m3) {
+    return `+${m3[1]} ĐRL`;
+  }
+
+  // Pattern 4: "X điểm rèn luyện" (strictly 1 to 20)
+  const standAloneDrlRegex = /\b([1-9]|1[0-9]|20)\s*(?:điểm rèn luyện|đrl|drl)\b/i;
+  const m4 = text.match(standAloneDrlRegex);
+  if (m4) {
+    return `+${m4[1]} ĐRL`;
+  }
+
   return undefined;
 }
 
 /**
- * Extracts deadline (hạn chót / đóng form)
+ * Extracts the exact registration deadline (hạn chót đóng form / đăng ký).
+ * Distinguishes from event time and publishing time!
  */
 export function extractDeadline(text: string): string | undefined {
-  const deadlineRegex = /(?:hạn chót|đóng form|thời gian đóng form|hạn đăng ký|hạn cuối)[:\s]+([^.\n\r]{5,60})/i;
-  const match = text.match(deadlineRegex);
-  if (match) {
-    return match[1].trim();
+  // Look for lines specifically mentioning deadline or form closing
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    if (
+      lower.includes('hạn chót') ||
+      lower.includes('đóng form') ||
+      lower.includes('hạn đăng ký') ||
+      lower.includes('thời hạn') ||
+      lower.includes('hạn cuối') ||
+      lower.includes('thời gian đóng') ||
+      lower.includes('trước ngày') ||
+      lower.includes('kết thúc đăng ký') ||
+      lower.includes('sẽ đóng')
+    ) {
+      // Remove leading label
+      const clean = line
+        .replace(/^.*?(?:thời hạn mở cổng đăng ký|thời hạn đăng ký|thời hạn|hạn chót|đóng form|hạn đăng ký|hạn cuối|thời gian đóng form|kết thúc đăng ký|form sẽ đóng|form đóng)[:\s]*/i, '')
+        .trim();
+      if (clean.length >= 4 && clean.length <= 80) {
+        return clean;
+      }
+      return line.slice(0, 80);
+    }
   }
+
+  // Regex fallback
+  const regex = /(?:hạn chót|đóng form|hạn đăng ký|hạn cuối)[:\s]+([^.\n\r]{5,65})/i;
+  const m = text.match(regex);
+  if (m) {
+    return m[1].trim();
+  }
+
   return undefined;
 }
 
 /**
- * Extracts event time / date
+ * Extracts the actual real event time / date.
+ * Distinguishes from deadline or publishing date.
  */
 export function extractEventTime(text: string): string | undefined {
-  const timeRegex = /(?:thời gian diễn ra|thời gian tổ chức|thời gian)[:\s]+([^.\n\r]{5,70})/i;
-  const match = text.match(timeRegex);
-  if (match) {
-    return match[1].trim();
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    // Exclude deadline lines
+    if (lower.includes('hạn chót') || lower.includes('đóng form') || lower.includes('hạn đăng ký')) {
+      continue;
+    }
+
+    if (
+      lower.includes('thời gian tổ chức') ||
+      lower.includes('thời gian diễn ra') ||
+      lower.includes('thời gian:') ||
+      lower.includes('thời gian sự kiện') ||
+      lower.includes('ngày diễn ra')
+    ) {
+      const clean = line
+        .replace(/^.*?(?:thời gian diễn ra|thời gian tổ chức|thời gian sự kiện|thời gian|ngày diễn ra)[:\s]*/i, '')
+        .trim();
+      if (clean.length >= 4 && clean.length <= 80) {
+        return clean;
+      }
+      return line.slice(0, 80);
+    }
   }
+
+  // Regex fallback
+  const regex = /(?:thời gian diễn ra|thời gian tổ chức|thời gian sự kiện)[:\s]+([^.\n\r]{5,75})/i;
+  const m = text.match(regex);
+  if (m) {
+    return m[1].trim();
+  }
+
   return undefined;
 }
 
 /**
- * Extracts student criteria category (Tiêu chí 1, 2, 3, 4, 5)
+ * Extracts TDTU criteria and maps directly to column 1..5 (Max 20 pts each)
  */
-export function extractCriteria(text: string): string | undefined {
-  const critRegex = /(tiêu chí\s*(?:[1-5]|i{1,3}|iv|v)(?:\.[0-9]+)?)/i;
-  const match = text.match(critRegex);
-  if (match) {
-    return match[0].trim().toUpperCase();
+export function extractCriteria(text: string): { criteriaText?: string; tdtuCriteriaId?: number } {
+  const lower = text.toLowerCase();
+
+  // Explicit check
+  if (lower.includes('tiêu chí 1') || lower.includes('tiêu chí i\b') || lower.includes('tiêu chí i:') || lower.includes('cột 1')) {
+    return { criteriaText: 'Cột 1: Ý thức học tập (max 20đ)', tdtuCriteriaId: 1 };
   }
-  return undefined;
+  if (lower.includes('tiêu chí 2') || lower.includes('tiêu chí ii\b') || lower.includes('tiêu chí ii:') || lower.includes('cột 2')) {
+    return { criteriaText: 'Cột 2: Chấp hành nội quy TDTU (max 20đ)', tdtuCriteriaId: 2 };
+  }
+  if (lower.includes('tiêu chí 3') || lower.includes('tiêu chí iii\b') || lower.includes('tiêu chí iii:') || lower.includes('cột 3')) {
+    return { criteriaText: 'Cột 3: Văn hóa, Thể thao & Truyền thông (max 20đ)', tdtuCriteriaId: 3 };
+  }
+  if (lower.includes('tiêu chí 4') || lower.includes('tiêu chí iv\b') || lower.includes('tiêu chí iv:') || lower.includes('cột 4')) {
+    return { criteriaText: 'Cột 4: Quan hệ cộng đồng & Tình nguyện (max 20đ)', tdtuCriteriaId: 4 };
+  }
+  if (lower.includes('tiêu chí 5') || lower.includes('tiêu chí v\b') || lower.includes('tiêu chí v:') || lower.includes('cột 5')) {
+    return { criteriaText: 'Cột 5: Tiên phong, Gương mẫu & Cán sự (max 20đ)', tdtuCriteriaId: 5 };
+  }
+
+  // Heuristic mapping based on TDTU activities
+  if (lower.includes('đồng phục') || lower.includes('thẻ sinh viên') || lower.includes('thẻ sv') || lower.includes('học phí') || lower.includes('ký túc xá') || lower.includes('nội quy')) {
+    return { criteriaText: 'Cột 2: Chấp hành nội quy TDTU (max 20đ)', tdtuCriteriaId: 2 };
+  }
+  if (lower.includes('hiến máu') || lower.includes('mùa hè xanh') || lower.includes('xuân tình nguyện') || lower.includes('tiếp sức mùa thi') || lower.includes('chủ nhật xanh') || lower.includes('từ thiện') || lower.includes('tình nguyện')) {
+    return { criteriaText: 'Cột 4: Quan hệ cộng đồng & Tình nguyện (max 20đ)', tdtuCriteriaId: 4 };
+  }
+  if (lower.includes('hội thao') || lower.includes('marathon') || lower.includes('văn nghệ') || lower.includes('đêm nhạc') || lower.includes('bóng đá') || lower.includes('bóng rổ') || lower.includes('cầu lông') || lower.includes('khảo sát trực tuyến') || lower.includes('like, share') || lower.includes('tâm lý')) {
+    return { criteriaText: 'Cột 3: Văn hóa, Thể thao & Truyền thông (max 20đ)', tdtuCriteriaId: 3 };
+  }
+  if (lower.includes('workshop') || lower.includes('techtalk') || lower.includes('nckh') || lower.includes('học thuật') || lower.includes('company tour') || lower.includes('seminar') || lower.includes('gpa') || lower.includes('nghiên cứu khoa học')) {
+    return { criteriaText: 'Cột 1: Ý thức học tập (max 20đ)', tdtuCriteriaId: 1 };
+  }
+  if (lower.includes('sinh viên 5 tốt') || lower.includes('sv5t') || lower.includes('cán sự') || lower.includes('lớp trưởng') || lower.includes('lớp phó') || lower.includes('bí thư') || lower.includes('bch đoàn') || lower.includes('chi hội trưởng')) {
+    return { criteriaText: 'Cột 5: Tiên phong, Gương mẫu & Cán sự (max 20đ)', tdtuCriteriaId: 5 };
+  }
+
+  return {};
 }
 
 /**
- * Core deterministic rule engine to classify post text into definite / potential / none
+ * Core deterministic rule engine to classify post text
  */
 export function classifyPostContent(text: string): PostAnalysisResult {
   const lower = text.toLowerCase();
+  const intent = detectPostIntent(text);
   const { formLinks, allLinks } = extractLinks(text);
-  
+
   const matchedDefinite: string[] = [];
   for (const kw of DEFINITE_KEYWORDS) {
     if (lower.includes(kw)) {
@@ -251,40 +471,44 @@ export function classifyPostContent(text: string): PostAnalysisResult {
   }
 
   const points = extractPoints(text);
+  const feeOrPrize = extractFeeOrPrize(text);
   const deadline = extractDeadline(text);
   const eventTime = extractEventTime(text);
-  const criteria = extractCriteria(text);
+  const { criteriaText, tdtuCriteriaId } = extractCriteria(text);
 
   let classification: ClassificationType = 'none';
   let confidence = 10;
   let explanation = 'Không phát hiện thông tin liên quan đến Điểm Rèn Luyện (ĐRL).';
 
-  // Rule 1: Chắc chắn có ĐRL (DEFINITE)
-  // Has explicit definite keywords (e.g. "điểm rèn luyện", "ĐRL", "tiêu chí 3")
-  if (matchedDefinite.length > 0) {
+  // RULE A: Question / Inquiry detection
+  // If the user is asking a question, do NOT classify as an official DRL post!
+  if (intent === 'question') {
+    classification = 'none';
+    confidence = 85;
+    explanation = 'Bài đăng dạng câu hỏi/thắc mắc của sinh viên, không phải thông báo mở form hay hoạt động cấp ĐRL chính thức.';
+  }
+  // RULE B: Definite ĐRL (Announcement + Explicit DRL)
+  else if (matchedDefinite.length > 0 || (points && formLinks.length > 0)) {
     classification = 'definite';
-    // If form link is present, confidence shoots up to 95-99%
     if (formLinks.length > 0) {
       confidence = 98;
-      explanation = `Chắc chắn có ĐRL (${matchedDefinite.slice(0, 3).join(', ')}) và đã tìm thấy link Form đăng ký trực tiếp.`;
+      explanation = `Chắc chắn có ĐRL (${matchedDefinite.slice(0, 3).join(', ') || points}) và đã trích xuất được link form đăng ký.`;
     } else {
       confidence = 88;
-      explanation = `Bài viết xác nhận cấp ĐRL (${matchedDefinite.slice(0, 3).join(', ')}).`;
+      explanation = `Thông báo khẳng định cộng ĐRL (${matchedDefinite.slice(0, 3).join(', ') || points}).`;
     }
-  } 
-  // Rule 2: Có thể có ĐRL (POTENTIAL)
-  // Has potential keywords (workshop, hội thảo, hiến máu, tình nguyện) OR has a form link with university activity words
+  }
+  // RULE C: Potential ĐRL (Events commonly granting DRL at TDTU)
   else if (matchedPotential.length > 0 || formLinks.length > 0) {
     classification = 'potential';
     confidence = formLinks.length > 0 ? 75 : 60;
-    explanation = `Bài viết về hoạt động sự kiện (${matchedPotential.slice(0, 3).join(', ') || 'có form đăng ký'}), thường sẽ được xét cộng ĐRL theo quy chế trường.`;
+    explanation = `Hoạt động phong trào/học thuật (${matchedPotential.slice(0, 3).join(', ') || 'có form đăng ký'}), thường được cộng ĐRL theo Quy chế TDTU.`;
   }
 
   const keyPhrases = Array.from(new Set([...matchedDefinite, ...matchedPotential])).slice(0, 8);
   const targetFormUrls = formLinks.length > 0 ? formLinks : allLinks.slice(0, 3);
 
-  // Generate a concise 1-2 sentence Vietnamese summary
-  const summary = generateQuickSummary(text, classification, points, deadline);
+  const summary = generateQuickSummary(text, classification, points, deadline, intent);
 
   return {
     classification,
@@ -295,7 +519,10 @@ export function classifyPostContent(text: string): PostAnalysisResult {
     eventTime,
     deadline,
     points,
-    criteria,
+    criteria: criteriaText,
+    intent,
+    feeOrPrize,
+    tdtuCriteriaId,
     explanation
   };
 }
@@ -304,11 +531,17 @@ function generateQuickSummary(
   text: string,
   classification: ClassificationType,
   points?: string,
-  deadline?: string
+  deadline?: string,
+  intent?: PostIntent
 ): string {
-  const firstLine = text.split('\n').map(l => l.trim()).filter(Boolean)[0] || 'Thông báo từ nhóm Facebook';
-  const cleanTitle = firstLine.length > 100 ? firstLine.slice(0, 97) + '...' : firstLine;
-  
+  if (intent === 'question') {
+    const firstLine = text.split('\n').map((l) => l.trim()).filter(Boolean)[0] || 'Câu hỏi từ sinh viên';
+    return `[THẮC MẮC] ${firstLine.slice(0, 95)}`;
+  }
+
+  const firstLine = text.split('\n').map((l) => l.trim()).filter(Boolean)[0] || 'Thông báo từ nhóm Facebook';
+  const cleanTitle = firstLine.length > 90 ? firstLine.slice(0, 87) + '...' : firstLine;
+
   if (classification === 'definite') {
     return `[CÓ ĐRL] ${cleanTitle}${points ? ` • ${points}` : ''}${deadline ? ` • Hạn: ${deadline}` : ''}`;
   } else if (classification === 'potential') {

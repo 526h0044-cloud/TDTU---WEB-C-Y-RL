@@ -41,6 +41,28 @@ export const PostScannerModal: React.FC<PostScannerModalProps> = ({
   const [error, setError] = useState('');
   const [fbFetchNotice, setFbFetchNotice] = useState('');
 
+  const handleResetForm = () => {
+    setContent('');
+    setPostUrl('');
+    setAuthorName('');
+    setAnalysisResult(null);
+    setSaveStatus(null);
+    setError('');
+    setFbFetchNotice('');
+  };
+
+  const handlePostUrlChange = (newUrl: string) => {
+    setPostUrl(newUrl);
+    const lower = newUrl.toLowerCase();
+    const matched = groups.find((g) => {
+      const gSlug = g.url.toLowerCase().split('/groups/')[1]?.replace(/\/.*$/, '');
+      return gSlug && lower.includes(gSlug);
+    });
+    if (matched) {
+      setSelectedGroupId(matched.id);
+    }
+  };
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -258,7 +280,7 @@ export const PostScannerModal: React.FC<PostScannerModalProps> = ({
                 <input
                   type="url"
                   value={postUrl}
-                  onChange={(e) => setPostUrl(e.target.value)}
+                  onChange={(e) => handlePostUrlChange(e.target.value)}
                   placeholder="https://www.facebook.com/groups/.../posts/..."
                   className="w-full rounded-lg border border-slate-300 bg-white pl-8 pr-3 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-hidden"
                 />
@@ -397,29 +419,50 @@ export const PostScannerModal: React.FC<PostScannerModalProps> = ({
 
               {/* Save Status Notification */}
               {saveStatus && (
-                <div
-                  className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
-                    saveStatus.isNew
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                      : 'bg-amber-50 text-amber-800 border border-amber-300'
-                  }`}
-                >
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>{saveStatus.message}</span>
+                <div className="space-y-2">
+                  <div
+                    className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                      saveStatus.isNew
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                        : 'bg-amber-50 text-amber-800 border border-amber-300'
+                    }`}
+                  >
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>{saveStatus.message}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleResetForm}
+                      className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                      Quét bài viết khác
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-3 py-1.5 rounded-lg bg-slate-900 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
+                    >
+                      Đóng & Xem danh sách
+                    </button>
+                  </div>
                 </div>
               )}
 
               {/* Push to Server Button */}
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={handleSaveToServer}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition-all"
-                >
-                  <span>Lưu bài viết lên Server (Chống trùng lặp)</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
+              {!saveStatus && (
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveToServer}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition-all"
+                  >
+                    <span>Lưu bài viết lên Server (Chống trùng lặp)</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

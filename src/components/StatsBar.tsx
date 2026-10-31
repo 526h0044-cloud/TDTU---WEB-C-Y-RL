@@ -5,10 +5,18 @@ import { ScannedPost } from '../types';
 interface StatsBarProps {
   posts: ScannedPost[];
   activeFilter: string;
+  hasFormOnly: boolean;
+  registeredOnly: boolean;
   onSelectFilter: (filter: string) => void;
 }
 
-export const StatsBar: React.FC<StatsBarProps> = ({ posts, activeFilter, onSelectFilter }) => {
+export const StatsBar: React.FC<StatsBarProps> = ({
+  posts,
+  activeFilter,
+  hasFormOnly,
+  registeredOnly,
+  onSelectFilter
+}) => {
   const definiteCount = posts.filter(p => p.classification === 'definite').length;
   const potentialCount = posts.filter(p => p.classification === 'potential').length;
   const formCount = posts.filter(p => p.formUrls && p.formUrls.length > 0).length;
@@ -19,10 +27,10 @@ export const StatsBar: React.FC<StatsBarProps> = ({ posts, activeFilter, onSelec
       {/* Definite DRL Card */}
       <button
         type="button"
-        onClick={() => onSelectFilter(activeFilter === 'definite' ? 'all' : 'definite')}
+        onClick={() => onSelectFilter('definite')}
         className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
           activeFilter === 'definite'
-            ? 'bg-emerald-500/10 border-emerald-500 shadow-xs'
+            ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-200 shadow-xs'
             : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'
         }`}
       >
@@ -38,10 +46,10 @@ export const StatsBar: React.FC<StatsBarProps> = ({ posts, activeFilter, onSelec
       {/* Potential DRL Card */}
       <button
         type="button"
-        onClick={() => onSelectFilter(activeFilter === 'potential' ? 'all' : 'potential')}
+        onClick={() => onSelectFilter('potential')}
         className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
           activeFilter === 'potential'
-            ? 'bg-amber-500/10 border-amber-500 shadow-xs'
+            ? 'bg-amber-50 border-amber-500 ring-2 ring-amber-200 shadow-xs'
             : 'bg-white border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
         }`}
       >
@@ -57,10 +65,10 @@ export const StatsBar: React.FC<StatsBarProps> = ({ posts, activeFilter, onSelec
       {/* Forms Available Card */}
       <button
         type="button"
-        onClick={() => onSelectFilter(activeFilter === 'has_form' ? 'all' : 'has_form')}
+        onClick={() => onSelectFilter('has_form')}
         className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
-          activeFilter === 'has_form'
-            ? 'bg-blue-500/10 border-blue-500 shadow-xs'
+          hasFormOnly
+            ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-200 shadow-xs'
             : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
         }`}
       >
@@ -76,10 +84,10 @@ export const StatsBar: React.FC<StatsBarProps> = ({ posts, activeFilter, onSelec
       {/* Registered / Completed Card */}
       <button
         type="button"
-        onClick={() => onSelectFilter(activeFilter === 'registered' ? 'all' : 'registered')}
+        onClick={() => onSelectFilter('registered')}
         className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
-          activeFilter === 'registered'
-            ? 'bg-purple-500/10 border-purple-500 shadow-xs'
+          registeredOnly
+            ? 'bg-purple-50 border-purple-500 ring-2 ring-purple-200 shadow-xs'
             : 'bg-white border-slate-200 hover:border-purple-300 hover:bg-purple-50/50'
         }`}
       >

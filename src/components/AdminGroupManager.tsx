@@ -64,6 +64,11 @@ export const AdminGroupManager: React.FC<AdminGroupManagerProps> = ({
       setFormError('Vui lòng nhập link nhóm Facebook hợp lệ (ví dụ: https://www.facebook.com/groups/...)');
       return;
     }
+    const cleanUrl = url.trim().toLowerCase();
+    if (groups.some((g) => g.url.toLowerCase() === cleanUrl)) {
+      setFormError('Đường link nhóm này đã tồn tại trong danh sách theo dõi!');
+      return;
+    }
 
     try {
       setIsSubmitting(true);

@@ -46,6 +46,9 @@ service cloud.firestore {
         && (!('deadline' in data) || (data.deadline is string && data.deadline.size() <= 200))
         && (!('points' in data) || (data.points is string && data.points.size() <= 100))
         && (!('criteria' in data) || (data.criteria is string && data.criteria.size() <= 200))
+        && (!('intent' in data) || (data.intent is string && data.intent.size() <= 50))
+        && (!('feeOrPrize' in data) || (data.feeOrPrize is string && data.feeOrPrize.size() <= 100))
+        && (!('tdtuCriteriaId' in data) || (data.tdtuCriteriaId is number && data.tdtuCriteriaId >= 1 && data.tdtuCriteriaId <= 5))
         && (!('isBookmarked' in data) || data.isBookmarked is bool)
         && (!('isRegistered' in data) || data.isRegistered is bool)
         && (!('keyPhrases' in data) || (data.keyPhrases is list && data.keyPhrases.size() <= 15))
@@ -82,7 +85,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidId(postId) && isValidPost(incoming())
         && incoming().keys().hasAll(['id', 'postUrl', 'rawContent', 'classification', 'createdAt', 'updatedAt'])
-        && incoming().keys().hasOnly(['id', 'groupId', 'groupName', 'postUrl', 'authorName', 'rawContent', 'summary', 'classification', 'confidence', 'keyPhrases', 'formUrls', 'eventTime', 'deadline', 'points', 'criteria', 'isBookmarked', 'isRegistered', 'scannedAt', 'createdAt', 'updatedAt']);
+        && incoming().keys().hasOnly(['id', 'groupId', 'groupName', 'postUrl', 'authorName', 'rawContent', 'summary', 'classification', 'confidence', 'keyPhrases', 'formUrls', 'eventTime', 'deadline', 'points', 'criteria', 'intent', 'feeOrPrize', 'tdtuCriteriaId', 'isBookmarked', 'isRegistered', 'scannedAt', 'createdAt', 'updatedAt']);
       allow update: if isValidId(postId) && isValidPost(incoming())
         && incoming().id == existing().id
         && incoming().createdAt == existing().createdAt;
